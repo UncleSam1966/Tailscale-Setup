@@ -119,11 +119,11 @@ chmod +x /etc/init.d/tailscale
 
 # Enable the tailscale service
   echo "[Tailscale-Install] Enabling Tailscale..."
-  /etc/init.d/tailscaled enable
+  /etc/init.d/tailscale enable
 
 # Start the tailscale service
   echo "[Tailscale-Install] Starting Tailscale..."
-  /etc/init.d/tailscaled start
+  /etc/init.d/tailscale start
 
 # Prompt the user for a Devivce Alias
   echo "[Tailscale-Install] Please provide a device alias"
@@ -158,7 +158,7 @@ EOF
 chmod +x /root/tailscale.sh
 
 # Setup a cron job to run the tailscale startup script every minute
-crontab -l | grep -q 'tailscale' || (crontab -l && echo "* * * * * /root/tailscale.sh") | crontab -
+crontab -l | grep -q 'tailscale.sh' || (crontab -l && echo "* * * * * /root/tailscale.sh") | crontab -
 
 # Setup firewall zones and rules and then restart firewall at the end
 # Add a new zone for tailscale
