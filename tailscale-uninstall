@@ -1,0 +1,128 @@
+#!/bin/sh
+
+SCRIPT="$(basename $0)"
+
+usage() {
+cat <<EOH
+
+Usage: $0 [options]
+
+Options:
+-U  Download the latest version of $SCRIPT from GitHub
+
+EOH
+exit
+}
+
+upgrade() {
+RESPONSE_CODE=$(curl -kLsI -o /dev/null -w '%{http_code}' https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/$SCRIPT)
+if [ "$RESPONSE_CODE" = 200 ];then
+curl -kL -o $SCRIPT https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/$SCRIPT
+if [ $? -eq 0 ];then
+  chmod +x $SCRIPT
+  echo "[Tailscale-Uninstall] Successfully downloaded $SCRIPT."
+else
+  echo "[Tailscale-Uninstall] Failed to download $SCRIPT."
+fi
+elif [ "$RESPONSE_CODE" = 404 ];then
+echo "[Tailscale-Uninstall] ERROR! Not found on GitHub???"
+elif [ "$RESPONSE_CODE" = 000 ];then
+echo "ERROR! No Internet connection???"
+else
+echo "[Tailscale-Uninstall] ERROR! Unknown response code $RESPONSE_CODE"
+fi
+exit
+}
+
+while getopts :U option; do
+case "${option}" in
+U)  upgrade;;
+*)  usage;;
+esac
+done
+shift $((OPTIND-1))
+
+echo 
+echo "Uninstalls Tailscale from this device if it is installed."
+echo 
+echo "If you wish to proceed, enter y otherwise just press [Enter] to stop: "
+echo 
+read REPLY
+if [ "$REPLY" != "y" -a "$REPLY" != "Y" ]; then
+#  rm ./runonce
+  echo "[Tailscale-Uninstall] Installation aborted."
+  echo 
+exit
+fi
+# Disable the tailscale service
+echo "[Tailscale-Uninstall] Disabling Tailscale..."
+/etc/init.d/tailscale disable
+echo "[Tailscale-Uninstall] Tailscale service has been disabled"
+
+# Stop the tailscale service
+echo "[Tailscale-Uninstall] Stopping Tailscale..."
+/etc/init.d/tailscale stop > /dev/null 2>&1
+echo "[Tailscale-Uninstall] Tailscale service has stopped"
+
+# Remove the tailscale service /etc/init.d/tailscale
+echo "[Tailscale-Uninstall] Removing Tailscale Service..."
+rm -rf /etc/init.d/tailscale
+rm -rf /etc/rc.d/K01tailscaled
+rm -rf /etc/rc.d/S95tailscaled
+rm -rf /var/run/tailscale
+echo "[Tailscale-Uninstall] Tailscale service has been removed"
+
+# Remove the tailscale startup script /root/tailscale.sh
+echo "[Tailscale-Uninstall] Removing Tailscale startup script..."
+rm -rf /root/tailscale.sh
+echo "[Tailscale-Uninstall] Tailscale startup script has been removed"
+
+# Remove the tailscale binaries /usr/sbin/tailscale & /usr/sbin/tailscaled
+echo "[Tailscale-Uninstall] Removing Tailscale binaries..."
+rm -rf /usr/sbin/tailscale
+rm -rf /usr/sbin/tailscaled
+echo "[Tailscale-Uninstall] Tailscale binaries have been removed"
+
+# Remove the cron job to run the tailscale startup script every minute
+echo "[Tailscale-Uninstall] Removing scheduled Tailscale startup script..."
+grep -q "tailscale.sh" /etc/crontabs/root
+if [ $? = 0 ]; then
+sed -e "/tailscale.sh/d" -i /etc/crontabs/root
+echo "[Tailscale-Uninstall] Scheduled Tailscale startup script has been removed"
+fi
+
+# Remove the cron job to run the tailscale update script every Saturday
+echo "[Tailscale-Uninstall] Removing scheduled Tailscale update script..."
+grep -q "tailscale-update" /etc/crontabs/root
+if [ $? = 0 ]; then
+sed -e "/tailscale-update/d" -i /etc/crontabs/root
+echo "[Tailscale-Uninstall] Scheduled Tailscale Update Script has been removed"
+fi
+
+# Remove the Tailscale firewall zones and rules and then restart firewall at the end
+echo "[Tailscale-Uninstall] Removing Tailscale firewall zones and rules..."
+fw=$(uci -q show firewall | grep -m1 -E "ailscale" | cut -d. -f1-2)
+while [ -n "$fw" ]; do
+  uci delete $fw
+  fw=$(uci -q show firewall | grep -m1 -E "ailscale" | cut -d. -f1-2)
+done
+uci commit
+/etc/init.d/firewall reload > /dev/null 2>&1
+echo "[Tailscale-Uninstall] Tailscale firewall zones and rules have been removed"
+
+# Remove the tailscale ip forwarding rules script /etc/sysctl.d/99-tailscale.conf
+echo "[Tailscale-Uninstall] Removing Tailscale IP forwarding..."
+rm -rf /etc/sysctl.d/99-tailscale.conf
+echo "[Tailscale-Uninstall] Tailscale IP forwarding has been removed"
+
+# Remove the file that contains files and directories to be preserved during an upgrade
+echo "[Tailscale-Uninstall] Removing Tailscale Keep File..."
+rm -rf /lib/upgrade/keep.d/tailscale
+echo "[Tailscale-Uninstall] Tailscale Keep File has been removed"
+
+# Remove the file that contains files and directories to be preserved during an upgrade
+echo "[Tailscale-Uninstall] Removing Tailscale config File..."
+rm -rf /var/lib/tailscale
+echo "[Tailscale-Uninstall] Tailscale config File has been removed"
+
+echo "[Tailscale-Uninstall] Tailscale has been uninstalled"

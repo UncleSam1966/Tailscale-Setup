@@ -75,7 +75,7 @@ echo "[Tailscale-Install] Latest Tailscale version is $LATEST"
   echo "[Tailscale-Install] Downloading $URL"
   curl -kLSO "$URL"
   echo "[Tailscale-Install] Extracting $FILENAME into /tmp"
-  tar -zxvf "$FILENAME"
+  tar -zxf "$FILENAME"
   cd /usr/sbin
   echo "[Tailscale-Install] Installing Tailscale version $LATEST..."
   cp "/tmp/$DIRNAME/tailscale" .
@@ -123,7 +123,7 @@ chmod +x /etc/init.d/tailscale
 
 # Start the tailscale service
   echo "[Tailscale-Install] Starting Tailscale..."
-  /etc/init.d/tailscale start
+  /etc/init.d/tailscale start > /dev/null 2>&1
 
 # Prompt the user for a Devivce Alias
   echo "[Tailscale-Install] Please provide a device alias"
@@ -132,7 +132,7 @@ chmod +x /etc/init.d/tailscale
   echo 
 
 # Acquire the IPv4 CIDR subnet address
-SUBNET=(ip route | grep br-lan | grep proto | sed 's/|/ /' | awk '{print $1}')
+SUBNET=$(ip route | grep br-lan | grep proto | sed 's/|/ /' | awk '{print $1}')
   echo "[Tailscale-Install] The device IPv4 CIDR subnet address is $SUBNET"
  
 # Create the Tailscale startup script /root/tailscale.sh
@@ -162,37 +162,41 @@ crontab -l | grep -q 'tailscale.sh' || (crontab -l && echo "* * * * * /root/tail
 
 # Setup firewall zones and rules and then restart firewall at the end
 # Add a new zone for tailscale
-uci add firewall.@zone[-1]=zone
-uci add firewall.@zone[-1].device='tailscale0'
-uci add firewall.@zone[-1].name='tailscale'
-uci add firewall.@zone[-1].mtu_fix='1'
-uci add firewall.@zone[-1].input='ACCEPT'
-uci add firewall.@zone[-1].forward='ACCEPT'
-uci add firewall.@zone[-1].masq='1'
-uci add firewall.@zone[-1].output='ACCEPT'
-uci add firewall.@zone[-1].network='tailscale' 'tailscale0'
+uci -q add firewall zone
+uci set firewall.@zone[-1].device='tailscale0'
+uci set firewall.@zone[-1].name='tailscale'
+uci set firewall.@zone[-1].mtu_fix='1'
+uci set firewall.@zone[-1].input='ACCEPT'
+uci set firewall.@zone[-1].forward='ACCEPT'
+uci set firewall.@zone[-1].masq='1'
+uci set firewall.@zone[-1].output='ACCEPT'
+uci add_list firewall.@zone[-1].network='tailscale'
+uci add_list firewall.@zone[-1].network='tailscale0'
 
 # Add new forwarding rules for tailscale
-uci add firewall.@forwarding[-1]=forwarding
-uci add firewall.@forwarding[-1].dest='lan'
-uci add firewall.@forwarding[-1].src='tailscale'
-uci add firewall.@forwarding[-1]=forwarding
-uci add firewall.@forwarding[-1].dest='wan'
-uci add firewall.@forwarding[-1].src='tailscale'
-uci add firewall.@forwarding[-1]=forwarding
-uci add firewall.@forwarding[-1].dest='tailscale'
-uci add firewall.@forwarding[-1].src='lan'
-uci add firewall.@forwarding[-1]=forwarding
-uci add firewall.@forwarding[-1].dest='tailscale'
-uci add firewall.@forwarding[-1].src='wan'
+uci -q add firewall forwarding
+uci set firewall.@forwarding[-1].dest='lan'
+uci set firewall.@forwarding[-1].src='tailscale'
+
+uci -q add firewall forwarding
+uci set firewall.@forwarding[-1].dest='wan'
+uci set firewall.@forwarding[-1].src='tailscale'
+
+uci -q add firewall forwarding
+uci set firewall.@forwarding[-1].dest='tailscale'
+uci set firewall.@forwarding[-1].src='lan'
+
+uci -q add firewall forwarding
+uci set firewall.@forwarding[-1].dest='tailscale'
+uci set firewall.@forwarding[-1].src='wan'
 
 # Add a new Firewall rule for tailscale
-uci add firewall.@rule[-1]=rule
-uci add firewall.@rule[-1].src='*'
-uci add firewall.@rule[-1].target='ACCEPT'
-uci add firewall.@rule[-1].proto='udp'
-uci add firewall.@rule[-1].name='Allow-Tailscale'
-uci add firewall.@rule[-1].dest_port='41641'
+uci -q add firewall rule
+uci set firewall.@rule[-1].src='*'
+uci set firewall.@rule[-1].target='ACCEPT'
+uci set firewall.@rule[-1].proto='udp'
+uci set firewall.@rule[-1].name='Allow-Tailscale'
+uci set firewall.@rule[-1].dest_port='41641'
 
 # Create script ip forwarding rules
 echo 'net.ipv4.ip_forward = 1' | sudo tee -a /etc/sysctl.d/99-tailscale.conf
@@ -216,9 +220,9 @@ echo "[Tailscale-Install] Visit the following link to authorise this tailscale i
 
 echo "[Tailscale-Install] Restarting modified services..."
 uci commit
-/etc/init.d/firewall reload
-/etc/init.d/network reload
-/etc/init.d/cron reload
+/etc/init.d/firewall reload > /dev/null 2>&1
+/etc/init.d/network reload > /dev/null 2>&1
+/etc/init.d/cron reload > /dev/null 2>&1
 
 echo "[Tailscale-Install] Cleaning up..."
 rm -rf "/tmp/$FILENAME" "/tmp/$DIRNAME" 
