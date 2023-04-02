@@ -1,0 +1,226 @@
+#!/bin/sh
+
+SCRIPT="$(basename $0)"
+
+usage() {
+cat <<EOH
+
+Usage: $0 [options]
+
+Options:
+ -U  Download the latest version of $SCRIPT from GitHub
+
+EOH
+exit
+}
+
+upgrade() {
+  RESPONSE_CODE=$(curl -kLsI -o /dev/null -w '%{http_code}' https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/$SCRIPT)
+  if [ "$RESPONSE_CODE" = 200 ];then
+    curl -kL -o $SCRIPT https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/$SCRIPT
+    if [ $? -eq 0 ];then
+      chmod +x $SCRIPT
+      echo "[Tailscale-Install] Successfully downloaded $SCRIPT."
+    else
+      echo "[Tailscale-Install] Failed to download $SCRIPT."
+    fi
+  elif [ "$RESPONSE_CODE" = 404 ];then
+    echo "[Tailscale-Install] ERROR! Not found on GitHub???"
+  elif [ "$RESPONSE_CODE" = 000 ];then
+    echo "ERROR! No Internet connection???"
+  else
+    echo "[Tailscale-Install] ERROR! Unknown response code $RESPONSE_CODE"
+  fi
+  exit
+}
+
+while getopts :U option; do
+ case "${option}" in
+  U)  upgrade;;
+  *)  usage;;
+ esac
+done
+shift $((OPTIND-1))
+
+echo 
+echo "Installs the latest release of Tailscale. The script assumes it is not installed."
+echo 
+echo "If you wish to proceed, enter y otherwise just press [Enter] to stop: "
+echo 
+read REPLY
+if [ "$REPLY" != "y" -a "$REPLY" != "Y" ]; then
+#  rm ./runonce
+      echo "[Tailscale-Install] Installation aborted."
+	  echo 
+  exit
+fi
+
+# Check the latest version of Tailscale
+echo "[Tailscale-Install] Getting latest Tailscale version..."
+LATEST=$(curl -ks https://tailscale.com/changelog/#client | awk '/<a id="/{print $3;}0' | head -n 1 | cut -c2-)
+[ -z "$LATEST" ] && { echo "[Tailscale-Install] ERROR! Could not determine latest Tailscale version. Aborting..."; exit 2; }
+echo "[Tailscale-Install] Latest Tailscale version is $LATEST"
+
+  case "$(uname -m)" in
+    aarch64)  ARCH="arm64";;
+    armv7l)   ARCH="arm";;
+    *)        echo "[Tailscale-Install] ERROR! Unable to handle $(uname -m) archictecture! Aborting..."; exit 2;;
+  esac
+  FILENAME="tailscale_${LATEST}_${ARCH}.tgz"
+  DIRNAME="tailscale_${LATEST}_${ARCH}"
+  URL="https://pkgs.tailscale.com/stable/$FILENAME"
+
+# Download the latest version of Tailscale static binaries
+  cd /tmp
+  echo "[Tailscale-Install] Downloading $URL"
+  curl -kLSO "$URL"
+  echo "[Tailscale-Install] Extracting $FILENAME into /tmp"
+  tar -zxvf "$FILENAME"
+  cd /usr/sbin
+  echo "[Tailscale-Install] Installing Tailscale version $LATEST..."
+  cp "/tmp/$DIRNAME/tailscale" .
+  cp "/tmp/$DIRNAME/tailscaled" .
+
+# Create the tailscale service /etc/init.d/tailscale
+cat <<"EOF" > /etc/init.d/tailscale
+#!/bin/sh /etc/rc.common
+USE_PROCD=1
+START=95
+STOP=01
+
+start_service() {
+	/usr/sbin/tailscaled --cleanup
+
+	procd_open_instance
+	procd_set_param command /usr/sbin/tailscaled
+
+# Set the port to listen on for incoming VPN packets.
+# Remote nodes will automatically be informed about the new port number,
+# but you might want to configure this in order to set external firewall
+# settings.
+	procd_append_param command --port 41641
+
+# OpenWRT /var is a symlink to /tmp, so write persistent state elsewhere.
+	procd_append_param command --state /etc/tailscale/tailscaled.state
+
+	procd_set_param respawn
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+
+	procd_close_instance
+}
+
+stop_service() {
+	/usr/sbin/tailscale down
+	/usr/sbin/tailscaled --cleanup
+}
+EOF
+chmod +x /etc/init.d/tailscale
+
+# Enable the tailscale service
+  echo "[Tailscale-Install] Enabling Tailscale..."
+  /etc/init.d/tailscaled enable
+
+# Start the tailscale service
+  echo "[Tailscale-Install] Starting Tailscale..."
+  /etc/init.d/tailscaled start
+
+# Prompt the user for a Devivce Alias
+  echo "[Tailscale-Install] Please provide a device alias"
+  echo 
+  read ALIAS
+  echo 
+
+# Acquire the IPv4 CIDR subnet address
+SUBNET=(ip route | grep br-lan | grep proto | sed 's/|/ /' | awk '{print $1}')
+  echo "[Tailscale-Install] The device IPv4 CIDR subnet address is $SUBNET"
+ 
+# Create the Tailscale startup script /root/tailscale.sh
+cat << EOF  > /root/tailscale.sh
+#!/bin/sh
+
+# Flags you need to pass to tailscale
+FLAGS="up"
+FLAGS=\$FLAGS" --reset"
+FLAGS=\$FLAGS" --hostname $ALIAS"
+
+# Extra flags you might want to pass to tailscale
+FLAGS=\$FLAGS" --advertise-routes=$SUBNET"
+
+# Unused flags
+# FLAGS=\$FLAGS" --netfilter-mode=off"
+# FLAGS=\$FLAGS" --advertise-exit-node"
+# FLAGS=\$FLAGS" --accept-routes"
+# FLAGS=\$FLAGS"login --authkey=tskey-auth-..."
+
+/usr/sbin/tailscale \$FLAGS
+EOF
+chmod +x /root/tailscale.sh
+
+# Setup a cron job to run the tailscale startup script every minute
+crontab -l | grep -q 'tailscale' || (crontab -l && echo "* * * * * /root/tailscale.sh") | crontab -
+
+# Setup firewall zones and rules and then restart firewall at the end
+# Add a new zone for tailscale
+uci add firewall.@zone[-1]=zone
+uci add firewall.@zone[-1].device='tailscale0'
+uci add firewall.@zone[-1].name='tailscale'
+uci add firewall.@zone[-1].mtu_fix='1'
+uci add firewall.@zone[-1].input='ACCEPT'
+uci add firewall.@zone[-1].forward='ACCEPT'
+uci add firewall.@zone[-1].masq='1'
+uci add firewall.@zone[-1].output='ACCEPT'
+uci add firewall.@zone[-1].network='tailscale' 'tailscale0'
+
+# Add new forwarding rules for tailscale
+uci add firewall.@forwarding[-1]=forwarding
+uci add firewall.@forwarding[-1].dest='lan'
+uci add firewall.@forwarding[-1].src='tailscale'
+uci add firewall.@forwarding[-1]=forwarding
+uci add firewall.@forwarding[-1].dest='wan'
+uci add firewall.@forwarding[-1].src='tailscale'
+uci add firewall.@forwarding[-1]=forwarding
+uci add firewall.@forwarding[-1].dest='tailscale'
+uci add firewall.@forwarding[-1].src='lan'
+uci add firewall.@forwarding[-1]=forwarding
+uci add firewall.@forwarding[-1].dest='tailscale'
+uci add firewall.@forwarding[-1].src='wan'
+
+# Add a new Firewall rule for tailscale
+uci add firewall.@rule[-1]=rule
+uci add firewall.@rule[-1].src='*'
+uci add firewall.@rule[-1].target='ACCEPT'
+uci add firewall.@rule[-1].proto='udp'
+uci add firewall.@rule[-1].name='Allow-Tailscale'
+uci add firewall.@rule[-1].dest_port='41641'
+
+# Create script ip forwarding rules
+echo 'net.ipv4.ip_forward = 1' | sudo tee -a /etc/sysctl.d/99-tailscale.conf
+echo 'net.ipv6.conf.all.forwarding = 1' | sudo tee -a /etc/sysctl.d/99-tailscale.conf
+sysctl -p /etc/sysctl.d/99-tailscale.conf
+
+# Create a file that contains files and directories to be preserved during an upgrade.
+cat <<"EOF" > /lib/upgrade/keep.d/tailscale
+/etc/init.d/tailscale
+/etc/rc.d/*tailscale
+/etc/tailscale/
+/lib/upgrade/keep.d/tailscale
+/usr/sbin/tailscale
+/usr/sbin/tailscaled
+/etc/sysctl.d/99-tailscale.conf
+EOF
+
+# Prompt  the user to login to the following webpage to authorise the installation and run the /root/tailscale.sh script.
+echo "[Tailscale-Install] Visit the following link to authorise this tailscale installation"
+/root/tailscale.sh
+
+echo "[Tailscale-Install] Restarting modified services..."
+uci commit
+/etc/init.d/firewall reload
+/etc/init.d/network reload
+/etc/init.d/cron reload
+
+echo "[Tailscale-Install] Cleaning up..."
+rm -rf "/tmp/$FILENAME" "/tmp/$DIRNAME" 
+echo "[Tailscale-Install] Done!"
+
