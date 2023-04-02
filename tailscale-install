@@ -163,45 +163,45 @@ crontab -l | grep -q 'tailscale.sh' || (crontab -l && echo "* * * * * /root/tail
 # Setup firewall zones and rules and then restart firewall at the end
 # Add a new zone for tailscale
 uci -q add firewall zone
-uci set firewall.@zone[-1].device='tailscale0'
-uci set firewall.@zone[-1].name='tailscale'
-uci set firewall.@zone[-1].mtu_fix='1'
-uci set firewall.@zone[-1].input='ACCEPT'
-uci set firewall.@zone[-1].forward='ACCEPT'
-uci set firewall.@zone[-1].masq='1'
-uci set firewall.@zone[-1].output='ACCEPT'
+uci -q set firewall.@zone[-1].device='tailscale0'
+uci -q set firewall.@zone[-1].name='tailscale'
+uci -q set firewall.@zone[-1].mtu_fix='1'
+uci -q set firewall.@zone[-1].input='ACCEPT'
+uci -q set firewall.@zone[-1].forward='ACCEPT'
+uci -q set firewall.@zone[-1].masq='1'
+uci -q set firewall.@zone[-1].output='ACCEPT'
 uci add_list firewall.@zone[-1].network='tailscale'
 uci add_list firewall.@zone[-1].network='tailscale0'
 
 # Add new forwarding rules for tailscale
 uci -q add firewall forwarding
-uci set firewall.@forwarding[-1].dest='lan'
-uci set firewall.@forwarding[-1].src='tailscale'
+uci -q set firewall.@forwarding[-1].dest='lan'
+uci -q set firewall.@forwarding[-1].src='tailscale'
 
 uci -q add firewall forwarding
-uci set firewall.@forwarding[-1].dest='wan'
-uci set firewall.@forwarding[-1].src='tailscale'
+uci -q set firewall.@forwarding[-1].dest='wan'
+uci -q set firewall.@forwarding[-1].src='tailscale'
 
 uci -q add firewall forwarding
-uci set firewall.@forwarding[-1].dest='tailscale'
-uci set firewall.@forwarding[-1].src='lan'
+uci -q set firewall.@forwarding[-1].dest='tailscale'
+uci -q set firewall.@forwarding[-1].src='lan'
 
 uci -q add firewall forwarding
-uci set firewall.@forwarding[-1].dest='tailscale'
-uci set firewall.@forwarding[-1].src='wan'
+uci -q set firewall.@forwarding[-1].dest='tailscale'
+uci -q set firewall.@forwarding[-1].src='wan'
 
 # Add a new Firewall rule for tailscale
 uci -q add firewall rule
-uci set firewall.@rule[-1].src='*'
-uci set firewall.@rule[-1].target='ACCEPT'
-uci set firewall.@rule[-1].proto='udp'
-uci set firewall.@rule[-1].name='Allow-Tailscale'
-uci set firewall.@rule[-1].dest_port='41641'
+uci -q set firewall.@rule[-1].src='*'
+uci -q set firewall.@rule[-1].target='ACCEPT'
+uci -q set firewall.@rule[-1].proto='udp'
+uci -q set firewall.@rule[-1].name='Allow-Tailscale'
+uci -q set firewall.@rule[-1].dest_port='41641'
 
 # Create script ip forwarding rules
-echo 'net.ipv4.ip_forward = 1' | sudo tee -a /etc/sysctl.d/99-tailscale.conf
-echo 'net.ipv6.conf.all.forwarding = 1' | sudo tee -a /etc/sysctl.d/99-tailscale.conf
-sysctl -p /etc/sysctl.d/99-tailscale.conf
+(echo 'net.ipv4.ip_forward = 1' | sudo tee -a /etc/sysctl.d/99-tailscale.conf) > /dev/null 2>&1
+(echo 'net.ipv6.conf.all.forwarding = 1' | sudo tee -a /etc/sysctl.d/99-tailscale.conf) > /dev/null 2>&1
+sysctl -p /etc/sysctl.d/99-tailscale.conf > /dev/null 2>&1
 
 # Create a file that contains files and directories to be preserved during an upgrade.
 cat <<"EOF" > /lib/upgrade/keep.d/tailscale
@@ -214,10 +214,6 @@ cat <<"EOF" > /lib/upgrade/keep.d/tailscale
 /etc/sysctl.d/99-tailscale.conf
 EOF
 
-# Prompt  the user to login to the following webpage to authorise the installation and run the /root/tailscale.sh script.
-echo "[Tailscale-Install] Visit the following link to authorise this tailscale installation"
-/root/tailscale.sh
-
 echo "[Tailscale-Install] Restarting modified services..."
 uci commit
 /etc/init.d/firewall reload > /dev/null 2>&1
@@ -227,4 +223,8 @@ uci commit
 echo "[Tailscale-Install] Cleaning up..."
 rm -rf "/tmp/$FILENAME" "/tmp/$DIRNAME" 
 echo "[Tailscale-Install] Done!"
+
+# Prompt  the user to login to the following webpage to authorise the installation and run the /root/tailscale.sh script.
+#echo "[Tailscale-Install] Visit the following link to authorise this tailscale installation"
+/root/tailscale.sh
 
