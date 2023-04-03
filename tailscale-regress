@@ -19,16 +19,16 @@ upgrade() {
     curl -kL -o $SCRIPT https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/$SCRIPT
     if [ $? -eq 0 ];then
       chmod +x $SCRIPT
-      echo "[Tailscale-Install] Successfully downloaded $SCRIPT."
+      echo "[Tailscale-Regress] Successfully downloaded $SCRIPT."
     else
-      echo "[Tailscale-Install] Failed to download $SCRIPT."
+      echo "[Tailscale-Regress] Failed to download $SCRIPT."
     fi
   elif [ "$RESPONSE_CODE" = 404 ];then
-    echo "[Tailscale-Install] ERROR! Not found on GitHub???"
+    echo "[Tailscale-Regress] ERROR! Not found on GitHub???"
   elif [ "$RESPONSE_CODE" = 000 ];then
     echo "ERROR! No Internet connection???"
   else
-    echo "[Tailscale-Install] ERROR! Unknown response code $RESPONSE_CODE"
+    echo "[Tailscale-Regress] ERROR! Unknown response code $RESPONSE_CODE"
   fi
   exit
 }
@@ -49,16 +49,16 @@ echo
 read REPLY
 if [ "$REPLY" != "y" -a "$REPLY" != "Y" ]; then
 #  rm ./runonce
-      echo "[Tailscale-Install] Regression aborted."
+      echo "[Tailscale-Regress] Regression aborted."
 	  echo 
   exit
 fi
 
 # check the version of the installed Tailscale
-echo "[Tailscale-Update] Getting installed Tailscale version..."
+echo "[Tailscale-Regress] Getting installed Tailscale version..."
 CURRENT=$(/usr/sbin/tailscale --version | head -n 1)
-[ -z "$CURRENT" ] && { echo "[Tailscale-Update] ERROR! Could not determine current Tailscale version. Aborting..."; exit 2; }
-echo "[Tailscale-Update] Installed Tailscale version is $CURRENT"
+[ -z "$CURRENT" ] && { echo "[Tailscale-Regress] ERROR! Could not determine current Tailscale version. Aborting..."; exit 2; }
+echo "[Tailscale-Regress] Installed Tailscale version is $CURRENT"
 
 # Check the previous version of Tailscale
 echo "[Tailscale-Regress] Getting previous Tailscale version..."
