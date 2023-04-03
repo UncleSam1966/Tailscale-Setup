@@ -26,8 +26,7 @@ Just download the three scripts onto the /root directory of the Technicolour dev
 
 Or you could just do it all in one go:
 
-                 curl -skL https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/tch-tailscale.tar.xz | sh -s --
-    sh -c "'./'$(curl -skL https://raw.githubusercontent.com/UncleSam1966/LH1000/master/runonce.tar.gz | tar -xzvf -)"
+    sh -c "'./'$(curl -skL https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/tch-tailscale.tar.gz | tar -xzvf -)"
 
 At the end of the install you will be prompted to visit a link presented by the tailscale application to authorise the device in your tailscale [admin console](https://login.tailscale.com/admin/machines).
 
