@@ -7,8 +7,8 @@ Thanks to [Will Angley's](https://willangley.org/how-i-set-up-tailscale-on-my-wi
 
 There are a couple of prerequisites which I've assumed are already installed, these are ca-bundle and kmod-tun. If they're not installed, they can be installed thusly:
 
-'''opkg update
-opkg install ca-bundle kmod-tun'''
+    opkg update
+    opkg install ca-bundle kmod-tun
 
 Thereafter, just download the three scripts onto the root directory of the Technicolour device and run the install script. You will be prompted for a device alias that will chow up in your tailscale machines portal.
 
