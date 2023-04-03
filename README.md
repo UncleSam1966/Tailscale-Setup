@@ -9,7 +9,7 @@ Thanks to [Will Angley's](https://willangley.org/how-i-set-up-tailscale-on-my-wi
 
 For firmware 20.3.c. only.
 
-Other firmware may not been compiled with TUN support in the kernel, and therefore VPN tunnels cannot be created. To check if your firmware dose have TUN support run ```zcat /proc/config.gz | grep CONFIG_TUN``` and if it returns ```CONFIG_TUN=y``` then you can potentially install Tailscale.
+Other firmware may not been compiled with TUN support in the kernel, and therefore VPN tunnels cannot be created. To check if your firmware does have TUN support run ```zcat /proc/config.gz | grep CONFIG_TUN``` and if it returns ```CONFIG_TUN=y``` then you can potentially install Tailscale.
 
 ## Prerequisites
 
