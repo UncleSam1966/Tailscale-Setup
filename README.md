@@ -30,6 +30,6 @@ Or you could just do it all in one go:
 
 At the end of the install you will be prompted to visit a link presented by the tailscale application to authorise the device in your tailscale [admin console](https://login.tailscale.com/admin/machines).
 
-Once approved, you can also choose to permit subnet access.
+Once approved, you can also choose to permit subnet access. **Note:** When the device is replaced or sold, remember to remove it from the Tailscale Machines portal.
 
 Happy Tunneling!
