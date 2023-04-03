@@ -130,6 +130,7 @@ echo "[Tailscale-Uninstall] Removing Tailscale installation files..."
 rm -rf /root/tailscale-install
 rm -rf /root/tailscale-update
 rm -rf /root/tailscale-uninstall
+rm -rf /root/tailscale-regress
 echo "[Tailscale-Uninstall] Tailscale Installation Files have been removed"
 
 echo "[Tailscale-Uninstall] Tailscale has been completely uninstalled"

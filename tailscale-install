@@ -58,7 +58,7 @@ fi
 # Download the Tailscale Uninstall and Update scripts
 echo "[Tailscale-Install] Getting additional Tailscale scripts..."
 
-for SCRIPT in tailscale-uninstall tailscale-update
+for SCRIPT in tailscale-uninstall tailscale-update tailscale-regress
 do {
   RESPONSE_CODE=$(curl -kLsI -o /dev/null -w '%{http_code}' https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/$SCRIPT)
   if [ "$RESPONSE_CODE" = 200 ];then
@@ -79,10 +79,6 @@ do {
 #  exit
 }
 done
-
-# curl -kL https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/tailscale-uninstall
-# curl -kL https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/tailscale-update
-
 
 echo "[Tailscale-Install] Got the additional Tailscale scripts"
 
