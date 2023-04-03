@@ -92,12 +92,12 @@ if [ $CURRENT != $LATEST ]; then
   tar -zxvf "$FILENAME"
   cd /usr/sbin
   echo "[Tailscale-Update] Stopping Tailscale $CURRENT..."
-  /etc/init.d/tailscaled stop
+  /etc/init.d/tailscale stop
   echo "[Tailscale-Update] Upgrading Tailscale to $LATEST..."
   cp "/tmp/$DIRNAME/tailscale" .
   cp "/tmp/$DIRNAME/tailscaled" .
   echo "[Tailscale-Update] Starting Tailscale..."
-  /etc/init.d/tailscaled start
+  /etc/init.d/tailscale start
   echo "[Tailscale-Update] Cleaning up..."
   rm -rf "/tmp/$FILENAME" "/tmp/$DIRNAME" 
 fi
