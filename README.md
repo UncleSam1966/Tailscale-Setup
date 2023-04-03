@@ -5,12 +5,24 @@ The need for me came about when I discovered my parent's device was behind a CG-
 
 Thanks to [Will Angley's](https://willangley.org/how-i-set-up-tailscale-on-my-wifi-router/) post and [ItsAllTooMuch4Me](https://github.com/seud0nym/tch-gui-unhide) for his excelllent work on the tch-gui-unhide and other utilities, I was able to convert Will's very helpful blog to a set of scripts to automate the install, update and removal of the Tailscale application on the Technicolour routers. I've currently only tested this on the DJA0231 successfully.
 
-There are a couple of prerequisites which I've assumed are already installed, these are ca-bundle and kmod-tun. If they're not installed, they can be installed thusly:
+## Firmware Applicability
+
+For firmware 20.3.c. only.
+
+All other firmware have not been compiled with TUN support in the kernel, and therefore VPN tunnels cannot be created.
+
+## Prerequisites
+
+Install / update System CA Certificates either manually:
 
     opkg update
-    opkg install ca-bundle kmod-tun
+    opkg install ca-certificates ca-bundle
 
-Thereafter, just download the three scripts onto the root directory of the Technicolour device and run the install script. You will be prompted for a device alias that will chow up in your tailscale machines portal.
+Or by downloading and running the [update-ca-certificates](https://github.com/seud0nym/tch-gui-unhide/tree/master/utilities#update-ca-certificates) script which will install the latest available certificates (and gives you the option to schedule a regular job to update them), whereas the opkg packages may not contain the latest certificates.
+
+## Installation of TailScale
+
+Just download the three scripts onto the /root directory of the Technicolour device and run the     tailscale-install script. You will be prompted for a device alias that will chow up in your tailscale machines portal.
 
 At the end of the install you will be prompted to visit a link presented by the tailscale application to authorise the device in your tailscale [admin console](https://login.tailscale.com/admin/machines).
 
