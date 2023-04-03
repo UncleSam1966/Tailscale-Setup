@@ -89,15 +89,15 @@ if [ $CURRENT != $LATEST ]; then
   echo "[Tailscale-Update] Downloading $URL"
   curl -kLSO "$URL"
   echo "[Tailscale-Update] Extracting $FILENAME into /tmp"
-  tar -zxvf "$FILENAME"
+  tar -zxf "$FILENAME"
   cd /usr/sbin
   echo "[Tailscale-Update] Stopping Tailscale $CURRENT..."
-  /etc/init.d/tailscale stop
+  /etc/init.d/tailscale stop > /dev/null 2>&1
   echo "[Tailscale-Update] Upgrading Tailscale to $LATEST..."
   cp "/tmp/$DIRNAME/tailscale" .
   cp "/tmp/$DIRNAME/tailscaled" .
   echo "[Tailscale-Update] Starting Tailscale..."
-  /etc/init.d/tailscale start
+  /etc/init.d/tailscale start > /dev/null 2>&1
   echo "[Tailscale-Update] Cleaning up..."
   rm -rf "/tmp/$FILENAME" "/tmp/$DIRNAME" 
 fi
