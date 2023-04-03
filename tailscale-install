@@ -55,16 +55,41 @@ if [ "$REPLY" != "y" -a "$REPLY" != "Y" ]; then
   exit
 fi
 
-# Download the Tailscale Upgrade and Uninstall scripts
+# Download the Tailscale Uninstall and Update scripts
 echo "[Tailscale-Install] Getting additional Tailscale scripts..."
-curl -skL https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/tailscale-uninstall
-curl -skL https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/tailscale-upgrade
+
+for SCRIPT in tailscale-uninstall tailscale-update
+do {
+  RESPONSE_CODE=$(curl -kLsI -o /dev/null -w '%{http_code}' https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/$SCRIPT)
+  if [ "$RESPONSE_CODE" = 200 ];then
+    curl -kL -o $SCRIPT https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/$SCRIPT
+    if [ $? -eq 0 ];then
+      chmod +x $SCRIPT
+      echo "[Tailscale-Install] Successfully downloaded $SCRIPT."
+    else
+      echo "[Tailscale-Install] Failed to download $SCRIPT."
+    fi
+  elif [ "$RESPONSE_CODE" = 404 ];then
+    echo "[Tailscale-Install] ERROR! Not found on GitHub???"
+  elif [ "$RESPONSE_CODE" = 000 ];then
+    echo "ERROR! No Internet connection???"
+  else
+    echo "[Tailscale-Install] ERROR! Unknown response code $RESPONSE_CODE"
+  fi
+#  exit
+}
+done
+
+# curl -kL https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/tailscale-uninstall
+# curl -kL https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/tailscale-update
+
+
 echo "[Tailscale-Install] Got the additional Tailscale scripts"
 
-# Check if tailscale is already installed and if so prompt to upgrade and exit
+# Check if tailscale is already installed and if so prompt to update and exit
 CURRENT=""
 CURRENT=$(/usr/sbin/tailscale --version | head -n 1)
-[ -z "$CURRENT" ] || { echo "[Tailscale-Install] Tailscale is already installed and its version is $CURRENT"; echo "[Tailscale-Install] Run tailscale-upgrade to check for a newer version and upgrade"; echo "[Tailscale-Install] Aborting Install..."; echo "[Tailscale-Install] Status is...";/usr/sbin/tailscale status; exit 2; }
+[ -z "$CURRENT" ] || { echo "[Tailscale-Install] Tailscale is already installed and its version is $CURRENT"; echo "[Tailscale-Install] Run tailscale-update to check for a newer version and update"; echo "[Tailscale-Install] Aborting Install..."; echo "[Tailscale-Install] Status is...";/usr/sbin/tailscale status; exit 2; }
 
 # Check the latest version of Tailscale
 echo "[Tailscale-Install] Getting latest Tailscale version..."
