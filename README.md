@@ -22,7 +22,7 @@ Or by downloading and running the [update-ca-certificates](https://github.com/se
 
 ## Installation of TailScale
 
-Just download the three scripts onto the /root directory of the Technicolour device and run the 'tailscale-install' script. You will be prompted for a device alias that will chow up in your tailscale machines portal.
+Just download the three scripts onto the /root directory of the Technicolour device and run the ``` tailscale-install``` script. You will be prompted for a device alias that will chow up in your tailscale machines portal.
 
 At the end of the install you will be prompted to visit a link presented by the tailscale application to authorise the device in your tailscale [admin console](https://login.tailscale.com/admin/machines).
 
