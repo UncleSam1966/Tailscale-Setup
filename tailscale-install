@@ -57,8 +57,8 @@ fi
 
 # Download the Tailscale Upgrade and Uninstall scripts
 echo "[Tailscale-Install] Getting additional Tailscale scripts..."
-https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/tailscale-uninstall
-https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/tailscale-upgrade
+curl -skL https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/tailscale-uninstall
+curl -skL https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/tailscale-upgrade
 echo "[Tailscale-Install] Got the additional Tailscale scripts"
 
 # Check if tailscale is already installed and if so prompt to upgrade and exit
