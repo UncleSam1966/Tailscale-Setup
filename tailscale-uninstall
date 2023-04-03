@@ -125,4 +125,11 @@ echo "[Tailscale-Uninstall] Removing Tailscale config File..."
 rm -rf /var/lib/tailscale
 echo "[Tailscale-Uninstall] Tailscale config File has been removed"
 
-echo "[Tailscale-Uninstall] Tailscale has been uninstalled"
+# Remove the installation files
+echo "[Tailscale-Uninstall] Removing Tailscale installation files..."
+rm -rf /root/tailscale-install
+rm -rf /root/tailscale-update
+rm -rf /root/tailscale-uninstall
+echo "[Tailscale-Uninstall] Tailscale Installation Files have been removed"
+
+echo "[Tailscale-Uninstall] Tailscale has been completely uninstalled"
