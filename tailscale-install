@@ -43,7 +43,7 @@ done
 shift $((OPTIND-1))
 
 echo 
-echo "Installs the latest release of Tailscale. The script assumes it is not installed."
+echo "Installs the latest release of Tailscale."
 echo 
 echo "If you wish to proceed, enter y otherwise just press [Enter] to stop: "
 echo 
@@ -54,6 +54,17 @@ if [ "$REPLY" != "y" -a "$REPLY" != "Y" ]; then
 	  echo 
   exit
 fi
+
+# Download the Tailscale Upgrade and Uninstall scripts
+echo "[Tailscale-Install] Getting additional Tailscale scripts..."
+https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/tailscale-uninstall
+https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/tailscale-upgrade
+echo "[Tailscale-Install] Got the additional Tailscale scripts"
+
+# Check if tailscale is already installed and if so prompt to upgrade and exit
+CURRENT=""
+CURRENT=$(/usr/sbin/tailscale --version | head -n 1)
+[ -z "$CURRENT" ] || { echo "[Tailscale-Install] Tailscale is already installed and its version is $CURRENT"; echo "[Tailscale-Install] Run tailscale-upgrade to check for a newer version and upgrade"; echo "[Tailscale-Install] Aborting Install..."; echo "[Tailscale-Install] Status is...";/usr/sbin/tailscale status; exit 2; }
 
 # Check the latest version of Tailscale
 echo "[Tailscale-Install] Getting latest Tailscale version..."
@@ -162,41 +173,41 @@ crontab -l | grep -q 'tailscale.sh' || (crontab -l && echo "* * * * * /root/tail
 
 # Setup firewall zones and rules and then restart firewall at the end
 # Add a new zone for tailscale
-uci -q add firewall zone
-uci -q set firewall.@zone[-1].device='tailscale0'
-uci -q set firewall.@zone[-1].name='tailscale'
-uci -q set firewall.@zone[-1].mtu_fix='1'
-uci -q set firewall.@zone[-1].input='ACCEPT'
-uci -q set firewall.@zone[-1].forward='ACCEPT'
-uci -q set firewall.@zone[-1].masq='1'
-uci -q set firewall.@zone[-1].output='ACCEPT'
-uci add_list firewall.@zone[-1].network='tailscale'
-uci add_list firewall.@zone[-1].network='tailscale0'
+uci -q add firewall zone > /dev/null
+uci -q set firewall.@zone[-1].device='tailscale0' > /dev/null
+uci -q set firewall.@zone[-1].name='tailscale' > /dev/null
+uci -q set firewall.@zone[-1].mtu_fix='1' > /dev/null
+uci -q set firewall.@zone[-1].input='ACCEPT' > /dev/null
+uci -q set firewall.@zone[-1].forward='ACCEPT' > /dev/null
+uci -q set firewall.@zone[-1].masq='1' > /dev/null
+uci -q set firewall.@zone[-1].output='ACCEPT' > /dev/null
+uci add_list firewall.@zone[-1].network='tailscale' > /dev/null
+uci add_list firewall.@zone[-1].network='tailscale0' > /dev/null
 
 # Add new forwarding rules for tailscale
-uci -q add firewall forwarding
-uci -q set firewall.@forwarding[-1].dest='lan'
-uci -q set firewall.@forwarding[-1].src='tailscale'
+uci -q add firewall forwarding > /dev/null
+uci -q set firewall.@forwarding[-1].dest='lan' > /dev/null
+uci -q set firewall.@forwarding[-1].src='tailscale' > /dev/null
 
-uci -q add firewall forwarding
-uci -q set firewall.@forwarding[-1].dest='wan'
-uci -q set firewall.@forwarding[-1].src='tailscale'
+uci -q add firewall forwarding > /dev/null
+uci -q set firewall.@forwarding[-1].dest='wan' > /dev/null
+uci -q set firewall.@forwarding[-1].src='tailscale' > /dev/null
 
-uci -q add firewall forwarding
-uci -q set firewall.@forwarding[-1].dest='tailscale'
-uci -q set firewall.@forwarding[-1].src='lan'
+uci -q add firewall forwarding > /dev/null
+uci -q set firewall.@forwarding[-1].dest='tailscale' > /dev/null
+uci -q set firewall.@forwarding[-1].src='lan' > /dev/null
 
-uci -q add firewall forwarding
-uci -q set firewall.@forwarding[-1].dest='tailscale'
-uci -q set firewall.@forwarding[-1].src='wan'
+uci -q add firewall forwarding > /dev/null
+uci -q set firewall.@forwarding[-1].dest='tailscale' > /dev/null
+uci -q set firewall.@forwarding[-1].src='wan' > /dev/null
 
 # Add a new Firewall rule for tailscale
-uci -q add firewall rule
-uci -q set firewall.@rule[-1].src='*'
-uci -q set firewall.@rule[-1].target='ACCEPT'
-uci -q set firewall.@rule[-1].proto='udp'
-uci -q set firewall.@rule[-1].name='Allow-Tailscale'
-uci -q set firewall.@rule[-1].dest_port='41641'
+uci -q add firewall rule > /dev/null
+uci -q set firewall.@rule[-1].src='*' > /dev/null
+uci -q set firewall.@rule[-1].target='ACCEPT' > /dev/null
+uci -q set firewall.@rule[-1].proto='udp' > /dev/null
+uci -q set firewall.@rule[-1].name='Allow-Tailscale' > /dev/null
+uci -q set firewall.@rule[-1].dest_port='41641' > /dev/null
 
 # Create script ip forwarding rules
 (echo 'net.ipv4.ip_forward = 1' | sudo tee -a /etc/sysctl.d/99-tailscale.conf) > /dev/null 2>&1
