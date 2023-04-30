@@ -1,5 +1,5 @@
 # tch-tailscale
-A tutorial to install Tailscale on Technicolour routers (Tested on Technicolour DJA0231)
+A tutorial to install Tailscale on Technicolour routers (Tested on Technicolour DJA0230 & DJA0231)
 
 The need for me came about when I discovered my parent's device was behind a CG-NAT and was therefore unable to remotely access their network for unattended troubleshooting puroses.
 
