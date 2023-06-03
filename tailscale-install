@@ -178,10 +178,10 @@ FLAGS=\$FLAGS" --hostname $ALIAS"
 
 # Extra flags you might want to pass to tailscale
 FLAGS=\$FLAGS" --advertise-routes=$SUBNET"
+FLAGS=\$FLAGS" --advertise-exit-node"
 
 # Unused flags
 # FLAGS=\$FLAGS" --netfilter-mode=off"
-# FLAGS=\$FLAGS" --advertise-exit-node"
 # FLAGS=\$FLAGS" --accept-routes"
 # FLAGS=\$FLAGS"login --authkey=tskey-auth-..."
 
@@ -189,9 +189,9 @@ FLAGS=\$FLAGS" --advertise-routes=$SUBNET"
 EOF
 chmod +x /root/tailscale.sh
 
-# This is not necessary
+# This is recommended to restart the tailscale when it crashes
 # Setup a cron job to run the tailscale startup script every minute
-# crontab -l | grep -q 'tailscale.sh' || (crontab -l && echo "* * * * * /root/tailscale.sh") | crontab -
+crontab -l | grep -q 'tailscale.sh' || (crontab -l && echo "* * * * * /root/tailscale.sh") | crontab -
 
 # Setup firewall zones and rules and then restart firewall at the end
 # Add a new zone for tailscale
