@@ -1,0 +1,575 @@
+#!/bin/sh
+
+SCRIPT="$(basename $0)"
+HOSTNAME=$(uci -q get system.@system[0].hostname)
+HOSTNAME=$(echo "$HOSTNAME" | tr A-Z a-z)
+
+usage() {
+cat <<EOH
+
+Tailscale installer for GL.iNet and Technicolour (firmware > 20.3.c.) devices 
+based on OpenWRT.
+
+By default, it will install the latest release of the Tailscale binaries from
+here: $(echo -e "\033[1;34m\033[4mhttps://pkgs.tailscale.com/stable/#static\033[0m")
+
+Usage: tailscale-setup [options]
+
+options:
+ -a alias     The Tailscale device alias for identification in the admin portal
+              If not specified, the machine name defaults to: $(echo -e "\033[7;32m$HOSTNAME\033[0m")
+
+ -c           Adds or removes a CRON Job to periodically upgrade Tailscale to 
+              the next version if it is installed
+
+ -d           Regress to the Previous version of Tailscale if it is installed
+
+ -i           Upgrade to the Next version of Tailscale if it is installed
+
+ -r           Removes Tailscale but retains the machine's identity and 
+              authorisation status
+
+ -u           Uninstalls Tailscale completely, including the machine's identity
+              and all its authorisations
+
+ -y           Bypass confirmation prompt (answers 'y'), as the first option
+
+ -U           Download the latest version of $SCRIPT from GitHub
+ 
+NOTE: All options are mutually exclusive. The FIRST specified will take precedence
+      all others are ignored.
+
+
+EOH
+
+if [ -n "$1" ]; then
+  local index=$(( $1 - 1 ))
+  echo -e "${ORANGE}ERROR! Parameter $index is an unknown option!${NC}"; 
+  echo -e
+fi
+
+# exit
+}
+
+
+BOLD='\033[1m'
+RED='\033[0;31m'
+GREEN='\033[1;32m'
+ORANGE='\033[0;33m'
+BLUE='\033[0;34m'
+REVERSED='\033[7m'
+NC='\033[0m' # No Color
+
+ALIAS="$HOSTNAME"
+BYPASS="N"
+REGRESS="N"
+REMOVE="N"
+UNINSTALL=N
+ARCH=""
+PARTPATH="/root"
+
+[ "/$1/" = "/-?/" -o "/$1/" = "/--help/" ] && usage
+
+case "$(uname -m)" in
+  aarch64)  ARCH="arm64";;
+  armv7l)   ARCH="arm";;
+  mips)     ARCH="mipsle";;
+  *)        echo -e "${RED}[$SCRIPT] ERROR! Unable to handle $(uname -m) archictecture! Aborting...${NC}"; exit 2;;
+esac
+
+if [ "$ARCH" = "mipsle" ] ; then
+  # find microSD
+  echo -e "${NC}[$SCRIPT] Finding microSD... ${NC}"
+  DEVPATH=""
+
+  if [ -b "/dev/sda" ]; then
+    DEVPATH="/dev/sda"
+    PARTPATH="/mnt/sda1"
+ elif [ -b "/dev/mmcblk0" ]; then
+    DEVPATH="/dev/mmcblk0"
+    PARTPATH="/mnt/mmcblk0p1"
+  else
+    echo -e "${RED}[$SCRIPT] ERROR! Can't find microSD /dev path. Aborteding... ${NC}"
+    exit 2
+  fi
+  echo -e "${GREEN}[$SCRIPT] Found microSD! $DEVPATH ${NC}"
+
+# Automount
+  block umount
+  block detect | uci import fstab
+  uci set fstab.@mount[-1].enabled='1'
+  uci commit fstab
+  block mount
+
+fi
+
+update() {
+  RESPONSE_CODE=$(curl -kLsI -o /dev/null -w '%{http_code}' https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/$SCRIPT)
+  if [ "$RESPONSE_CODE" = 200 ];then
+    curl -kL -o $SCRIPT https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/$SCRIPT
+    if [ $? -eq 0 ];then
+      chmod +x $SCRIPT
+      echo -e "${GREEN}[$SCRIPT] Successfully downloaded $SCRIPT.${NC}"
+    else
+      echo -e "${ORANGE}[$SCRIPT] Failed to download $SCRIPT.${NC}"
+    fi
+  elif [ "$RESPONSE_CODE" = 404 ];then
+    echo -e "${ORANGE}[$SCRIPT] ERROR! Not found on GitHub???${NC}"
+  elif [ "$RESPONSE_CODE" = 000 ];then
+    echo -e "${RED}ERROR! No Internet connection???${NC}"
+  else
+    echo -e "${RED}[$SCRIPT] ERROR! Unknown response code $RESPONSE_CODE${NC}"
+  fi
+  exit
+}
+
+install() {
+  if [ "$BYPASS" != "Y" ] ; then
+	echo -e 
+	echo -e "${NC}Installs the latest release of Tailscale.${NC}"
+	echo -e 
+	echo -e "${NC}If you wish to proceed, enter y otherwise just press [Enter] to stop: ${NC}"
+	echo -e 
+	read -r REPLY
+	if [ "$REPLY" != "y" -a "$REPLY" != "Y" ]; then
+	#  rm ./runonce
+		  echo -e "${RED}[$SCRIPT] Installation aborted.${NC}"
+		  echo -e 
+	  exit
+	fi
+  fi
+
+# Check if tailscale is already installed and if so prompt to update and exit
+  CURRENT=""
+  if [ -e /usr/sbin/tailscale ] ;then 
+	CURRENT=$(/usr/sbin/tailscale --version | head -n 1);
+  fi
+  if [ ! -z "$CURRENT" ] ; then 
+    echo -e "${ORANGE}[$SCRIPT] Tailscale is already installed and its version is $CURRENT"
+    echo -e "${ORANGE}[$SCRIPT] Run $SCRIPT -i to check for a newer version and upgrade${NC}"
+    echo -e "${RED}[$SCRIPT] Aborting Install...${NC}"
+    echo -e "${ORANGE}[$SCRIPT] $(/usr/sbin/tailscale status | grep Tailscale || echo -e "${GREEN}Tailscale is running")${NC}"
+    exit 2
+  fi
+
+# Check the latest version of Tailscale
+  echo -e "${NC}[$SCRIPT] Getting latest Tailscale version...${NC}"
+  LATEST=$(curl -ks https://tailscale.com/changelog | awk '/<a id="/{print $3;}0' | head -n 1 | cut -c2-)
+  if [ -z "$LATEST" ] ; then
+	echo -e "${RED}[$SCRIPT] ERROR! Could not determine latest Tailscale version. Aborting...${NC}"
+	exit 2
+  fi		
+  echo -e "${ORANGE}[$SCRIPT] Latest Tailscale version is $LATEST${NC}"
+
+  FILENAME="tailscale_${LATEST}_${ARCH}.tgz"
+  DIRNAME="tailscale_${LATEST}_${ARCH}"
+  URL="https://pkgs.tailscale.com/stable/$FILENAME"
+
+# Download the latest version of Tailscale static binaries
+  cd $PARTPATH
+  echo -e "${NC}[$SCRIPT] Downloading $URL${NC}"
+  curl -kLSO "$URL"
+  echo -e "${NC}[$SCRIPT] Extracting $FILENAME into $PARTPATH${NC}"
+  tar -zxf "$FILENAME" -C $PARTPATH
+  if [ "$ARCH" = "mipsle" ] ; then
+    [ ! -d "$PARTPATH/tailscale" ] && mkdir "$PARTPATH/tailscale"
+    echo -e "${NC}[$SCRIPT] Installing Tailscale version $LATEST...${NC}"
+    mv "$PARTPATH/$DIRNAME/tailscale" $PARTPATH/tailscale
+    mv "$PARTPATH/$DIRNAME/tailscaled" $PARTPATH/tailscale
+  fi
+# create symbolic links to the binaries
+  ln -s $PARTPATH/tailscale/tailscale /usr/sbin/tailscale
+  ln -s $PARTPATH/tailscale/tailscaled /usr/sbin/tailscaled
+
+# Create the tailscale service /etc/init.d/tailscale
+  echo -e "${NC}[$SCRIPT] Creating the tailscale service...${NC}"
+cat <<EOF > /etc/init.d/tailscale
+#!/bin/sh /etc/rc.common
+USE_PROCD=1
+START=95
+STOP=01
+
+start_service() {
+  /usr/sbin/tailscaled --cleanup
+
+  procd_open_instance
+  procd_set_param command /usr/sbin/tailscaled
+
+# Set the port to listen on for incoming VPN packets.
+# Remote nodes will automatically be informed about the new port number,
+# but you might want to configure this in order to set external firewall
+# settings.
+  procd_append_param command --port 41641
+
+# OpenWRT /var is a symlink to /tmp, so write persistent state elsewhere.
+  procd_append_param command --state $PARTPATH/tailscale/tailscaled.state
+
+  procd_set_param respawn
+  procd_set_param stdout 1
+  procd_set_param stderr 1
+  procd_close_instance
+}
+
+stop_service() {
+  /usr/sbin/tailscale down
+  /usr/sbin/tailscaled --cleanup
+}
+EOF
+
+  chmod +x /etc/init.d/tailscale
+
+# Enable the tailscale service
+  echo -e "${NC}[$SCRIPT] Enabling Tailscale...${NC}"
+  /etc/init.d/tailscale enable
+
+# Start the tailscale service
+  echo -e "${NC}[$SCRIPT] Starting Tailscale...${NC}"
+  /etc/init.d/tailscale start > /dev/null 2>&1
+
+# Set the Devivce Alias
+  echo -e "${NC}[$SCRIPT] Setting the device alias to: ${GREEN}${REVERSED}$ALIAS${NC}"
+
+# Acquire the IPv4 CIDR subnet address
+  SUBNET=$(ip route | grep br-lan | grep proto | sed 's/|/ /' | awk '{print $1}')
+  echo -e "${NC}[$SCRIPT] The device IPv4 CIDR subnet address is ${REVERSED}$SUBNET${NC}"
+ 
+# Flags you need to pass to tailscale
+  FLAGS="up"
+  FLAGS=$FLAGS" --reset"
+  FLAGS=$FLAGS" --hostname $ALIAS"
+
+# Extra flags you might want to pass to tailscale
+  FLAGS=$FLAGS" --advertise-routes=$SUBNET"
+  FLAGS=$FLAGS" --advertise-exit-node"
+
+# Unused flags
+#  FLAGS=\$FLAGS" --netfilter-mode=off"
+#  FLAGS=\$FLAGS" --accept-routes"
+#  FLAGS=\$FLAGS"login --authkey=tskey-auth-..."
+
+# Setup firewall zones and rules and then restart firewall at the end
+  echo -e "${NC}[$SCRIPT] Setting up Firewall rules for Tailscale${NC}"
+# Add a new zone for tailscale
+  uci -q add firewall zone > /dev/null
+  uci -q set firewall.@zone[-1].device='tailscale0' > /dev/null
+  uci -q set firewall.@zone[-1].name='tailscale' > /dev/null
+  uci -q set firewall.@zone[-1].mtu_fix='1' > /dev/null
+  uci -q set firewall.@zone[-1].input='ACCEPT' > /dev/null
+  uci -q set firewall.@zone[-1].forward='ACCEPT' > /dev/null
+  uci -q set firewall.@zone[-1].masq='1' > /dev/null
+  uci -q set firewall.@zone[-1].output='ACCEPT' > /dev/null
+  uci add_list firewall.@zone[-1].network='tailscale' > /dev/null
+  uci add_list firewall.@zone[-1].network='tailscale0' > /dev/null
+
+# Add new forwarding rules for tailscale
+  uci -q add firewall forwarding > /dev/null
+  uci -q set firewall.@forwarding[-1].dest='lan' > /dev/null
+  uci -q set firewall.@forwarding[-1].src='tailscale' > /dev/null
+
+  uci -q add firewall forwarding > /dev/null
+  uci -q set firewall.@forwarding[-1].dest='wan' > /dev/null
+  uci -q set firewall.@forwarding[-1].src='tailscale' > /dev/null
+
+  uci -q add firewall forwarding > /dev/null
+  uci -q set firewall.@forwarding[-1].dest='tailscale' > /dev/null
+  uci -q set firewall.@forwarding[-1].src='lan' > /dev/null
+
+  uci -q add firewall forwarding > /dev/null
+  uci -q set firewall.@forwarding[-1].dest='tailscale' > /dev/null
+  uci -q set firewall.@forwarding[-1].src='wan' > /dev/null
+
+# Add a new Firewall rule for tailscale
+  uci -q add firewall rule > /dev/null
+  uci -q set firewall.@rule[-1].src='*' > /dev/null
+  uci -q set firewall.@rule[-1].target='ACCEPT' > /dev/null
+  uci -q set firewall.@rule[-1].proto='udp' > /dev/null
+  uci -q set firewall.@rule[-1].name='Allow-Tailscale' > /dev/null
+  uci -q set firewall.@rule[-1].dest_port='41641' > /dev/null
+
+# Create a file that contains files and directories to be preserved during an upgrade.
+  echo -e "${NC}[$SCRIPT] Setting up Tailscale to be preserved during a firmware upgrade${NC}"
+cat <<EOF > /lib/upgrade/keep.d/tailscale
+/root/tailscale-setup
+/usr/sbin/tailscale
+/usr/sbin/tailscaled
+/etc/init.d/tailscale
+/etc/rc.d/*tailscale
+/etc/sysctl.d/99-tailscale.conf
+/lib/upgrade/keep.d/tailscale
+EOF
+
+  echo -e "${NC}[$SCRIPT] Restarting modified services...${NC}"
+  uci commit
+  /etc/init.d/firewall reload > /dev/null 2>&1
+  /etc/init.d/network reload > /dev/null 2>&1
+  /etc/init.d/cron reload > /dev/null 2>&1
+
+  crontoggle
+
+  cleanup
+  
+# Prompt  the user to login to the following webpage to authorise the installation.
+  # echo "${NC}[$SCRIPT] Visit the following link to authorise this tailscale installation${NC}"
+  /usr/sbin/tailscale $FLAGS
+
+  exit
+}
+
+regress() {
+  if [ "$BYPASS" != "Y" ] ; then
+	echo -e 
+	echo -e "${ORANGE}Regress the installed release of Tailscale.${NC}"
+	echo -e 
+	echo -e "${NC}If you wish to proceed, enter y otherwise just press [Enter] to stop: ${NC}"
+	echo -e 
+	read -r REPLY
+	if [ "$REPLY" != "y" -a "$REPLY" != "Y" ]; then
+	#  rm ./runonce
+		  echo -e "${GREEN}[$SCRIPT] Regress aborted.${NC}"
+		  echo -e 
+	  exit
+	fi
+  fi
+
+# check the version of the installed Tailscale
+  echo -e "${NC}[$SCRIPT] Getting installed Tailscale version...${NC}"
+  CURRENT=$(/usr/sbin/tailscale --version | head -n 1)
+  if [ -z "$CURRENT" ] ; then
+    echo -e "${RED}[$SCRIPT] ERROR! Could not determine current Tailscale version. Aborting...${NC}"
+	exit 2
+  fi
+  echo -e "${NC}[$SCRIPT] Installed Tailscale version is $CURRENT${NC}"
+
+# Check the previous version of Tailscale
+  echo -e "${NC}[$SCRIPT] Getting previous Tailscale version...${NC}"
+  PREVIOUS=$(curl -ks https://tailscale.com/changelog | awk '/<a id="/{print $3;}0' | head -n 2 | tail -n 1 | cut -c2-)
+  if [ -z "$PREVIOUS" ] ; then
+    echo -e "${RED}[$SCRIPT] ERROR! Could not determine previous Tailscale version. Aborting...${NC}"
+	exit 2
+  fi
+  echo -e "${NC}[$SCRIPT] Previous version of Tailscale is $PREVIOUS${NC}"
+
+  echo -e "${NC}[$SCRIPT] Stopping Tailscale version $CURRENT...${NC}"
+  /etc/init.d/tailscale stop > /dev/null 2>&1
+
+  get_tailscale $PREVIOUS
+
+  echo -e "${NC}[$SCRIPT] Starting Tailscale...${NC}"
+  /etc/init.d/tailscale start > /dev/null 2>&1
+
+  cleanup
+  
+  exit
+}
+
+uninstall() {
+  if [ "$BYPASS" != "Y" ] ; then
+	if [ "$REMOVE" = "N" ] ; then
+	   FULLREMOVAL="partially"
+	else
+	   FULLREMOVAL="completely"
+	fi
+	echo -e 
+	echo -e "${RED}Uninstalls the current release of Tailscale $FULLREMOVAL.${NC}"
+	echo -e 
+	echo -e "${NC}If you wish to proceed, enter y otherwise just press [Enter] to stop: ${NC}"
+	echo -e 
+	read -r REPLY
+	if [ "$REPLY" != "y" -a "$REPLY" != "Y" ]; then
+	#  rm ./runonce
+		  echo -e "${GREEN}[$SCRIPT] Uninstallation aborted.${NC}"
+		  echo -e 
+	  exit
+	fi
+  fi
+
+# Disable the tailscale service
+  echo -e "${NC}[$SCRIPT] Disabling Tailscale...${NC}"
+  /etc/init.d/tailscale disable
+  echo -e "${GREEN}[$SCRIPT] Tailscale service has been disabled${NC}"
+
+# Stop the tailscale service
+  echo -e "${NC}[$SCRIPT] Stopping Tailscale...${NC}"
+  /etc/init.d/tailscale stop > /dev/null 2>&1
+  echo -e "${GREEN}[$SCRIPT] Tailscale service has stopped${NC}"
+
+# Remove the tailscale service /etc/init.d/tailscale
+  echo -e "${NC}[$SCRIPT] Removing Tailscale Service...${NC}"
+  rm -rf /etc/init.d/tailscale
+  rm -rf /etc/rc.d/K01tailscaled
+  rm -rf /etc/rc.d/S95tailscaled
+  rm -rf /var/run/tailscale
+  echo -e "${GREEN}[$SCRIPT] Tailscale service has been removed${NC}"
+
+# Remove the tailscale binaries /usr/sbin/tailscale & /usr/sbin/tailscaled
+  echo -e "${NC}[$SCRIPT] Removing Tailscale binaries...${NC}"
+  rm -rf /usr/sbin/tailscale
+  rm -rf /usr/sbin/tailscaled
+  rm -rf $PARTPATH/tailscale/tailscale
+  rm -rf $PARTPATH/tailscale/tailscaled
+  echo -e "${GREEN}[$SCRIPT] Tailscale binaries have been removed${NC}"
+
+# Remove the cron job to run the tailscale update script every Saturday
+  echo -e "${NC}[$SCRIPT] Removing scheduled Tailscale update script...${NC}"
+  grep -q "$SCRIPT" /etc/crontabs/root
+  if [ $? = 0 ]; then
+    sed -e "/$SCRIPT/d" -i /etc/crontabs/root
+    echo -e "${NC}[$SCRIPT] Scheduled Tailscale update has been removed.${NC}"
+  fi
+
+# Remove the Tailscale firewall zones and rules and then restart firewall at the end
+  echo -e "${NC}[$SCRIPT] Removing Tailscale firewall zones and rules...${NC}"
+  fw=$(uci -q show firewall | grep -m1 -E "ailscale" | cut -d. -f1-2)
+  while [ -n "$fw" ]; do
+    uci delete $fw
+    fw=$(uci -q show firewall | grep -m1 -E "ailscale" | cut -d. -f1-2)
+  done
+  uci commit
+  /etc/init.d/firewall reload > /dev/null 2>&1
+  echo -e "${GREEN}[$SCRIPT] Tailscale firewall zones and rules have been removed${NC}"
+
+# Remove the tailscale ip forwarding rules script /etc/sysctl.d/99-tailscale.conf
+  echo -e "${NC}[$SCRIPT] Removing Tailscale IP forwarding...${NC}"
+  rm -rf /etc/sysctl.d/99-tailscale.conf
+  echo -e "${GREEN}[$SCRIPT] Tailscale IP forwarding has been removed${NC}"
+
+# Remove the file that contains files and directories to be preserved during an upgrade
+  echo -e "${NC}[$SCRIPT] Removing Tailscale Keep File...${NC}"
+  rm -rf /lib/upgrade/keep.d/tailscale
+  echo -e "${GREEN}[$SCRIPT] Tailscale Keep File has been removed${NC}"
+
+# Completely remove or retain identity files for reinstall
+  if [ "$REMOVE" = "Y" ] ; then
+# Remove the installation files
+    echo -e "${NC}[$SCRIPT] Removing Tailscale installation files...${NC}"
+    rm -rf /root/tailscale-setup
+    echo -e "${GREEN}[$SCRIPT] Tailscale installation files have been removed${NC}"
+
+# Remove the directory that contains the logs and config files
+    echo -e "${NC}[$SCRIPT] Removing Tailscale config files...${NC}"
+    rm -rf /var/lib/tailscale
+    rm -rf $PARTPATH/tailscale
+    echo -e "${GREEN}[$SCRIPT] Tailscale config files have been removed${NC}"
+    echo -e "${GREEN}[$SCRIPT] Tailscale has been completely uninstalled${NC}"
+  else
+    echo -e "${ORANGE}[$SCRIPT] Tailscale installation files have not been removed${NC}"
+    echo -e "${ORANGE}[$SCRIPT] Tailscale config files have not been removed${NC}"
+    echo -e "${ORANGE}[$SCRIPT] Tailscale has not been completely uninstalled${NC}"
+    echo -e "${ORANGE}[$SCRIPT] Tailscale can be reinstalled by running ./$SCRIPT${NC}"
+  fi
+  exit
+}
+
+upgrade() {
+  if [ "$BYPASS" != "Y" ] ; then
+	echo -e 
+	echo -e "${ORANGE}Upgrades the installed release of Tailscale.${NC}"
+	echo -e 
+	echo -e "${NC}If you wish to proceed, enter y otherwise just press [Enter] to stop: ${NC}"
+	echo -e 
+	read -r REPLY
+	if [ "$REPLY" != "y" -a "$REPLY" != "Y" ]; then
+	#  rm ./runonce
+		  echo -e "${GREEN}[$SCRIPT] Upgrade aborted.${NC}"
+		  echo -e 
+	  exit
+	fi
+  fi
+
+# check the version of the installed Tailscale
+  echo -e "${NC}[$SCRIPT] Getting installed Tailscale version...${NC}"
+  CURRENT=$(/usr/sbin/tailscale --version | head -n 1)
+  [ -z "$CURRENT" ] && { echo -e "${RED}[$SCRIPT] ERROR! Could not determine current Tailscale version. Aborting...${NC}"; exit 2; }
+  echo -e "${NC}[$SCRIPT] Installed Tailscale version is $CURRENT${NC}"
+
+# Check the latest version of Tailscale
+  echo -e "${NC}[$SCRIPT] Getting latest Tailscale version...${NC}"
+  LATEST=$(curl -ks https://tailscale.com/changelog | awk '/<a id="/{print $3;}0' | head -n 1 | cut -c2-)
+  [ -z "$LATEST" ] && { echo -e "${RED}[$SCRIPT] ERROR! Could not determine latest Tailscale version. Aborting...${NC}"; exit 2; }
+  echo -e "${NC}[$SCRIPT] Latest Tailscale version is $LATEST${NC}"
+
+  if [ $CURRENT != $LATEST ]; then
+    echo -e "${NC}[$SCRIPT] Stopping Tailscale version $CURRENT...${NC}"
+    /etc/init.d/tailscale stop > /dev/null 2>&1
+
+    get_tailscale $LATEST
+
+    echo -e "${NC}[$SCRIPT] Starting Tailscale...${NC}"
+    /etc/init.d/tailscale start > /dev/null 2>&1
+
+    cleanup
+  fi
+  exit
+}
+
+crontoggle() {
+  grep -q "$SCRIPT" /etc/crontabs/root
+  if [ $? = 0 ]; then
+    sed -e "/$SCRIPT/d" -i /etc/crontabs/root
+    echo -e "${NC}[$SCRIPT] Scheduled Tailscale update has been removed.${NC}"
+  else
+    mm=$(awk 'BEGIN{srand();print int(rand()*59);}')
+    hh=$(awk 'BEGIN{srand();print int(rand()*3)+2;}')
+    echo "$mm $hh * * 5 $(cd $(dirname $0); pwd)/$SCRIPT -yi" >> /etc/crontabs/root
+    echo -e "${NC}[$SCRIPT] Tailscale update has been scheduled to execute every Saturday at $hh:$(printf '%02d' $mm)am.${NC}"
+  fi
+  /etc/init.d/cron reload
+  exit
+}
+
+get_tailscale() {
+  FILENAME="tailscale_$1_${ARCH}.tgz"
+  DIRNAME="tailscale_$1_${ARCH}"
+  URL="https://pkgs.tailscale.com/stable/$FILENAME"
+
+# Download the requisite version of Tailscale static binaries
+  cd $PARTPATH
+  echo -e "${NC}[$SCRIPT] Downloading $URL${NC}"
+  curl -kLSO "$URL"
+  echo -e "${NC}[$SCRIPT] Extracting $FILENAME into $PARTPATH${NC}"
+  tar -zxf "$FILENAME" -C $PARTPATH
+
+  # RUNNING=$(/usr/sbin/tailscale status | head -n 1);
+  # if [ ${#RUNNING} -le 7 ] ; then
+    # echo -e "${NC}[$SCRIPT] Stopping Tailscale version $1...${NC}"
+    # /etc/init.d/tailscale stop > /dev/null 2>&1
+  # fi
+
+  if [ "$ARCH" = "mipsle" ] ; then
+    [ ! -d "$PARTPATH/tailscale" ] && mkdir "$PARTPATH/tailscale"
+    echo -e "${NC}[$SCRIPT] Installing Tailscale version $1...${NC}"
+    mv "$PARTPATH/$DIRNAME/tailscale" $PARTPATH/tailscale
+    mv "$PARTPATH/$DIRNAME/tailscaled" $PARTPATH/tailscale
+  fi
+  return
+}
+
+cleanup() {
+  echo -e "${NC}[$SCRIPT] Cleaning up...${NC}"
+  rm -rf "$FILENAME" "$DIRNAME" 
+  echo -e "${GREEN}[$SCRIPT] Done!${NC}"
+  return
+}
+
+while getopts a:cdiruyU option ; do
+    case $option in
+        a)  ALIAS="${OPTARG}";;
+        c)  crontoggle;;
+        d)  REGRESS="Y";regress;;
+        i)  upgrade;;
+        r)  REMOVE="N";uninstall;;
+        u)  REMOVE="Y";uninstall;;
+        U)  update;;
+        y)  BYPASS="Y";;
+        *)  usage;;
+    esac
+done
+
+# Check if no options were specified
+if [[ $OPTIND -eq 1 ]]; then
+    usage
+fi
+
+shift $((OPTIND-1))
+
+install
