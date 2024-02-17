@@ -1,17 +1,17 @@
-# tch-tailscale
-A tutorial to install Tailscale on Technicolour routers (Tested on Technicolour DJA0230 & DJA0231)
+# tailscale-setup
+A tutorial to install Tailscale on Technicolour routers (Tested on Technicolour DJA0230, DJA0231, CobraXh amd GL.iNet Mango GL-MT300N-V2)
 
 The need for me came about when I discovered my parent's device was behind a CG-NAT and was therefore unable to remotely access their network for unattended troubleshooting puroses.
 
 Thanks to [Will Angley's](https://willangley.org/how-i-set-up-tailscale-on-my-wifi-router/) post and [ItsAllTooMuch4Me](https://github.com/seud0nym/tch-gui-unhide) for his excelllent work on the tch-gui-unhide and other utilities, I was able to convert Will's very helpful blog to a set of scripts to automate the install, update, regress and removal of the Tailscale application on the Technicolour routers. I've currently only tested this on the DJA0231 successfully.
 
-## Firmware Applicability
+## Firmware Applicability (Technicolor)
 
-For firmware 20.3.c. only.
+For firmware 20.3.c. and above only.
 
 Other firmware may not been compiled with TUN support in the kernel, and therefore VPN tunnels cannot be created. To check if your firmware does have TUN support run ```zcat /proc/config.gz | grep CONFIG_TUN``` and if it returns ```CONFIG_TUN=y``` then you can potentially install Tailscale.
 
-## Prerequisites
+## Prerequisites (Technicolor)
 
 Install / update System CA Certificates either manually:
 
@@ -22,11 +22,22 @@ Or by downloading and running the [update-ca-certificates](https://github.com/se
 
 ## Installation of TailScale
 
-Just download the four scripts onto the /root directory of the Technicolour device and run the ```tailscale-install``` script. You will be prompted for a device alias that will show up in your Tailscale Machines portal.
+Execute this command on your device via a PuTTY session or equivalent (an active WAN/Internet connection is required):
+```
+curl -skLo tailscale-setup https://github.com/UncleSam1966/tch-tailscale/releases/latest/download/tailscale-setup  && chmod +x tailscale-setup && ./tailscale-setup
+```
 
-Or you could just do it all in one go:
+Alternatively, download the script manually and load it up to your device using WinSCP or equivalent.
 
-    sh -c "'./'$(curl -skL https://raw.githubusercontent.com/UncleSam1966/tch-tailscale/master/tch-tailscale.tar.gz | tar -xzvf -)"
+After you have the script on your device, you may need to make it executable, which is done with this command (assuming you are in the same directory as the script):
+```
+chmod +x tailscale-setup
+```
+
+Then, execute the script (assuming you are in the same directory into which you downloaded or uploaded the script):
+```
+./tailscale-setup
+```
 
 At the end of the install you will be prompted to visit a link presented by the tailscale application to authorise the device in your tailscale [admin console](https://login.tailscale.com/admin/machines).
 
