@@ -3,7 +3,7 @@ A simple script to install Tailscale on Technicolor & GL.iNet routers (Tested on
 
 The need for me came about when I discovered my parent's device was behind a CG-NAT and was therefore unable to remotely access their network for unattended troubleshooting puroses.
 
-Thanks to [Will Angley's](https://willangley.org/how-i-set-up-tailscale-on-my-wifi-router/) post and [ItsAllTooMuch4Me](https://github.com/seud0nym/tch-gui-unhide) for his excelllent work on the tch-gui-unhide and other utilities, I was able to convert Will's very helpful blog to a set of scripts to automate the install, update, regress and removal of the Tailscale application on the Technicolour routers. I've currently only tested this on the DJA0231 successfully.
+Thanks to [Will Angley's](https://willangley.org/how-i-set-up-tailscale-on-my-wifi-router/) post and [ItsAllTooMuch4Me](https://github.com/seud0nym/tch-gui-unhide) for his excelllent work on the tch-gui-unhide and other utilities, I was able to convert Will's very helpful blog to a set of scripts to automate the install, update, regress and removal of the Tailscale application on the Technicolour routers.
 
 ## Firmware Applicability (Technicolor)
 
