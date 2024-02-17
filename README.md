@@ -1,5 +1,5 @@
-# tailscale-setup
-A tutorial to install Tailscale on Technicolour routers (Tested on Technicolour DJA0230, DJA0231, CobraXh amd GL.iNet Mango GL-MT300N-V2)
+# TailScale-Setup
+A simple script to install Tailscale on Technicolor & GL.iNet routers (Tested on Technicolour DJA0230, DJA0231, CobraXh and GL.iNet Mango GL-MT300N-V2)
 
 The need for me came about when I discovered my parent's device was behind a CG-NAT and was therefore unable to remotely access their network for unattended troubleshooting puroses.
 
