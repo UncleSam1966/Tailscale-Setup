@@ -67,6 +67,7 @@ REMOVE="N"
 UNINSTALL=N
 ARCH=""
 PARTPATH="/root"
+FIRSTRUN="N"
 
 [ "/$1/" = "/-?/" -o "/$1/" = "/--help/" ] && usage
 
@@ -161,25 +162,7 @@ install() {
   fi		
   echo -e "${ORANGE}[$SCRIPT] Latest Tailscale version is $LATEST${NC}"
 
-  FILENAME="tailscale_${LATEST}_${ARCH}.tgz"
-  DIRNAME="tailscale_${LATEST}_${ARCH}"
-  URL="https://pkgs.tailscale.com/stable/$FILENAME"
-
-# Download the latest version of Tailscale static binaries
-  cd $PARTPATH
-  echo -e "${NC}[$SCRIPT] Downloading $URL${NC}"
-  curl -kLSO "$URL"
-  echo -e "${NC}[$SCRIPT] Extracting $FILENAME into $PARTPATH${NC}"
-  tar -zxf "$FILENAME" -C $PARTPATH
-  if [ "$ARCH" = "mipsle" ] ; then
-    [ ! -d "$PARTPATH/tailscale" ] && mkdir "$PARTPATH/tailscale"
-    echo -e "${NC}[$SCRIPT] Installing Tailscale version $LATEST...${NC}"
-    mv "$PARTPATH/$DIRNAME/tailscale" $PARTPATH/tailscale
-    mv "$PARTPATH/$DIRNAME/tailscaled" $PARTPATH/tailscale
-  fi
-# create symbolic links to the binaries
-  ln -s $PARTPATH/tailscale/tailscale /usr/sbin/tailscale
-  ln -s $PARTPATH/tailscale/tailscaled /usr/sbin/tailscaled
+  get_tailscale $LATEST
 
 # Create the tailscale service /etc/init.d/tailscale
   echo -e "${NC}[$SCRIPT] Creating the tailscale service...${NC}"
@@ -304,6 +287,7 @@ EOF
   /etc/init.d/network reload > /dev/null 2>&1
   /etc/init.d/cron reload > /dev/null 2>&1
 
+  FIRSTRUN="Y"
   crontoggle
 
   cleanup
@@ -514,7 +498,12 @@ crontoggle() {
     echo -e "${NC}[$SCRIPT] Tailscale update has been scheduled to execute every Saturday at $hh:$(printf '%02d' $mm)am.${NC}"
   fi
   /etc/init.d/cron reload
-  exit
+
+  if [ "$FIRSTRUN" = "Y" ] ; then
+    return
+  else
+    exit
+  fi
 }
 
 get_tailscale() {
@@ -527,20 +516,21 @@ get_tailscale() {
   echo -e "${NC}[$SCRIPT] Downloading $URL${NC}"
   curl -kLSO "$URL"
   echo -e "${NC}[$SCRIPT] Extracting $FILENAME into $PARTPATH${NC}"
-  tar -zxf "$FILENAME" -C $PARTPATH
+  tar -zxf "$FILENAME" # -C $PARTPATH
 
-  # RUNNING=$(/usr/sbin/tailscale status | head -n 1);
-  # if [ ${#RUNNING} -le 7 ] ; then
-    # echo -e "${NC}[$SCRIPT] Stopping Tailscale version $1...${NC}"
-    # /etc/init.d/tailscale stop > /dev/null 2>&1
-  # fi
-
-  if [ "$ARCH" = "mipsle" ] ; then
-    [ ! -d "$PARTPATH/tailscale" ] && mkdir "$PARTPATH/tailscale"
-    echo -e "${NC}[$SCRIPT] Installing Tailscale version $1...${NC}"
-    mv "$PARTPATH/$DIRNAME/tailscale" $PARTPATH/tailscale
-    mv "$PARTPATH/$DIRNAME/tailscaled" $PARTPATH/tailscale
+  if [ ! -d "$PARTPATH/tailscale" ] ; then
+    mkdir "$PARTPATH/tailscale"
   fi
+  
+  echo -e "${NC}[$SCRIPT] Installing Tailscale version $1...${NC}"
+  mv "$PARTPATH/$DIRNAME/tailscale" $PARTPATH/tailscale/
+  mv "$PARTPATH/$DIRNAME/tailscaled" $PARTPATH/tailscale/
+
+# create symbolic links to the binaries
+  echo -e "${NC}[$SCRIPT] Creating symbolic links...${NC}"
+  ln -s $PARTPATH/tailscale/tailscale /usr/sbin/tailscale
+  ln -s $PARTPATH/tailscale/tailscaled /usr/sbin/tailscaled
+
   return
 }
 
