@@ -20,7 +20,7 @@ Install / update System CA Certificates either manually:
 
 Or by downloading and running the [update-ca-certificates](https://github.com/seud0nym/tch-gui-unhide/tree/master/utilities#update-ca-certificates) script which will install the latest available certificates (and gives you the option to schedule a regular job to update them), whereas the opkg packages may not contain the latest certificates.
 
-## Installation of TailScale
+## Installation of Tailscale
 
 Execute this command on your device via a PuTTY session or equivalent (an active WAN/Internet connection is required):
 ```
