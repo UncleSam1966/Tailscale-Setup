@@ -278,6 +278,7 @@ cat <<EOF > /lib/upgrade/keep.d/tailscale
 /etc/init.d/tailscale
 /etc/rc.d/*tailscale
 /etc/sysctl.d/99-tailscale.conf
+$PARTPATH/tailscale/
 /lib/upgrade/keep.d/tailscale
 EOF
 
