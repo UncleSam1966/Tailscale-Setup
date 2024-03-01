@@ -56,7 +56,7 @@ Make sure you are in the directory in which the ```tch-gui-unhide``` script in i
 
 ## Removal Instructions
 Remove the Tailscale instalation with ```tailscale-setup -yu```
-Delete ```tch-gui-unhide-xtra.tailscale
+Delete ```tch-gui-unhide-xtra.tailscale```
 Re-run ```tch-gui-unhide``` to remove the GUI changes, and the additional transformer mappings
 
 Happy Tunneling!
