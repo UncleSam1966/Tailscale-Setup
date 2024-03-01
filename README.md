@@ -45,16 +45,16 @@ Once approved, you can also choose to permit subnet access. ***Note:** When the 
 
 ## NEW - Extra GUI Script for Technicolor Routers - ```tch-gui-unhide-xtra.tailscale```
 
-# Firmware Applicability
+## Firmware Applicability
 Should be applicable to all firmware versions supported by ```tch-gui-unhide```.
 
-# Prerequisites
+## Prerequisites
 Make sure you are in the directory in which the ```tch-gui-unhide``` script in installed, and then execute the above ```tailscale-setup``` commands to install the latest tailscale-setup package and configuration.
 
-# Installation
+## Installation
 ./tch-gui-unhide
 
-# Removal Instructions
+## Removal Instructions
 Remove the Tailscale instalation with ```tailscale-setup -yu```
 Delete ```tch-gui-unhide-xtra.tailscale
 Re-run ```tch-gui-unhide``` to remove the GUI changes, and the additional transformer mappings
