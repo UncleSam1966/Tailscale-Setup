@@ -43,4 +43,20 @@ At the end of the install you will be prompted to visit a link presented by the 
 
 Once approved, you can also choose to permit subnet access. ***Note:** When the device is replaced or sold, remember to remove it from the Tailscale Machines portal.*
 
+## NEW - Extra GUI Script for Technicolor Routers - ```tch-gui-unhide-xtra.tailscale```
+
+# Firmware Applicability
+Should be applicable to all firmware versions supported by ```tch-gui-unhide```.
+
+# Prerequisites
+Make sure you are in the directory in which the ```tch-gui-unhide``` script in installed, and then execute the above ```tailscale-setup``` commands to install the latest tailscale-setup package and configuration.
+
+# Installation
+./tch-gui-unhide
+
+# Removal Instructions
+Remove the Tailscale instalation with ```tailscale-setup -yu```
+Delete ```tch-gui-unhide-xtra.tailscale
+Re-run ```tch-gui-unhide``` to remove the GUI changes, and the additional transformer mappings
+
 Happy Tunneling!
