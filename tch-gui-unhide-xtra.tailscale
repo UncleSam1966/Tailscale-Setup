@@ -61,7 +61,7 @@ local tailscale_flags = {
   config = config_tailscale,
   section = "flags",
   type = "flags",
-  options = { "tsup","reset","alias","subnet","exit" }
+  options = { "tsup","reset","alias","subnet","exit","ssh" }
 }
 
 mapper("uci_1to1").registerSimpleMap(tailscale_flags)
@@ -70,6 +70,8 @@ UCI
 ^tailscale%.service /etc/init.d/tailscale reload
 ^tailscale%.flags /root/tailscale/flags
 CA
+if [ ! -e "/etc/config/tailscale" ]; then
+    
   cat <<CFG > /etc/config/tailscale
 config tailscale 'service'
 	option enabled "$SERVICE"
@@ -81,7 +83,10 @@ config tailscale 'flags'
 	option alias "$ALIAS"
 	option subnet "$SUBNET"
 	option exit "$EXIT"
+	option ssh "0"
 CFG
+fi
+    
   cat <<"CRD" > /www/cards/004_tailscale.lp
 --pretranslated: do not change this file
  ngx.print('<style>\
@@ -116,6 +121,7 @@ local content = {
   alias = "uci.tailscale.flags.alias",
   subnet = "uci.tailscale.flags.subnet",
   isexit = "uci.tailscale.flags.exit",
+  ssh = "uci.tailscale.flags.ssh",
 }
 content_helper.getExactContent(content)
 
@@ -126,6 +132,13 @@ local setalias = "Alias: "
 local setsubnet = "Subnet: "
 local exitnode = "Exit Node: "
 local resetdefaults = "Reset to Defaults: "
+local setssh = "SSH: "
+
+if content.ssh == "1" then
+  content.ssh = "Yes"
+else
+  content.ssh = "No"
+end
 
 if content.TSup == "1" then
   content.TSup = "Yes"
@@ -141,12 +154,12 @@ end
 
 local tailscaleStatus
 if TSstate.state == "1" then
-  tailscaleStatus = "Activated"
+  tailscaleStatus = "Enabled"
 else
-  tailscaleStatus = "NotActivated"
+  tailscaleStatus = "Not Enabled"
 end
 
-if tailscaleStatus == "Activated" then
+if tailscaleStatus == "Enabled" then
   status = "light green"
 elseif tailscaleStatus:match("Error") then
   status = "light red"
@@ -166,11 +179,12 @@ ngx.print('\
 -- Conditionally print the last 5 lines only when Tailscale service is enabled
 if TSstate.state == "1" then
   ngx.print('\
-      <p class="subinfos" style="padding-left: 20px;"><strong>TailScale Up: </strong><span style="padding-left: 6px;">',content.TSup,'</span></p>\
-      <p class="subinfos" style="padding-left: 20px;"><strong>Service Port: </strong><span style="padding-left: 6px;">',content.port,'</span></p>\
-      <p class="subinfos" style="padding-left: 20px;"><strong>Alias: </strong><span style="padding-left: 50px;">',content.alias,'</span></p>\
-      <p class="subinfos" style="padding-left: 20px;"><strong>Subnet: </strong><span style="padding-left: 37px;">',content.subnet,'</span></p>\
-      <p class="subinfos" style="padding-left: 20px;"><strong>Exit Node: </strong><span style="padding-left: 24px;">',content.isexit,'</span></p>\
+      <p class="subinfos">TailScale Up: <span><strong>',content.TSup,'</strong></span></p>\
+      <p class="subinfos">Service Port: <span><strong>',content.port,'</strong></span></p>\
+      <p class="subinfos">Device Alias: <span><strong>',content.alias,'</strong></span></p>\
+      <p class="subinfos">Subnet route: <span><strong>',content.subnet,'</strong></span></p>\
+      <p class="subinfos">Is Exit Node: <span><strong>',content.isexit,'</strong></span></p>\
+      <p class="subinfos">SSH Enabled: <span><strong>',content.ssh,'</strong></span></p>\
 ')
 end
 
@@ -199,6 +213,7 @@ local qry_params = {
   subnet = "uci.tailscale.flags.subnet",
   isexit = "uci.tailscale.flags.exit",
   reset = "uci.tailscale.flags.reset",
+  ssh = "uci.tailscale.flags.ssh",
 }
 
 local qry_valid = {
@@ -209,6 +224,7 @@ local qry_valid = {
   subnet = post_helper.validateIPAndSubnet(4),
   isexit = post_helper.validateBoolean,
   reset = post_helper.validateBoolean,
+  ssh = post_helper.validateBoolean,
 }
 
 local qry_data,qry_helpmsg = post_helper.handleQuery(qry_params,qry_valid)
@@ -230,6 +246,7 @@ ngx.print(ui_helper.createHeader(T"TailScale",false,true),'\
         ui_helper.createInputText(T"Subnet","subnet",qry_data["subnet"],nil,qry_helpmsg["subnet"]),
         ui_helper.createSwitch(T"Exit Node","isexit",qry_data["isexit"],nil,qry_helpmsg["isexit"]),
         ui_helper.createSwitch(T"Reset","reset",qry_data["reset"],nil,qry_helpmsg["reset"]),
+        ui_helper.createSwitch(T"SSH","ssh",qry_data["ssh"],nil,qry_helpmsg["ssh"]),
       '\
     </fieldset>\
   </form>\
@@ -259,13 +276,21 @@ else
     EXIT=""
 fi
 
+SSH=$(uci -q get tailscale.flags.ssh)
+if [ "$SSH" = "0" ]; then
+    SSH="=false"
+  FLAGS=$SSH
+else
+    SSH=""
+fi
+
 TSUP=$(uci -q get tailscale.flags.tsup)
 if [ "$TSUP" = "0" ]; then
     TSUP="down"
   FLAGS=$TSUP
 else
     TSUP="up"
-  FLAGS=$TSUP$RESET" --advertise-exit-node$EXIT"" --advertise-routes=$SUBNET"" --hostname=$ALIAS"
+  FLAGS=$TSUP$RESET" --advertise-exit-node$EXIT"" --advertise-routes=$SUBNET"" --hostname=$ALIAS"" --ssh$SSH"
 fi
 
 /usr/sbin/tailscale $FLAGS

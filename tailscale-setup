@@ -68,6 +68,8 @@ UNINSTALL=N
 ARCH=""
 PARTPATH="/root"
 FIRSTRUN="N"
+LATEST=$(curl -s https://tailscale.com/changelog | sed -n 's/.*\(Tailscale v[0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p' | sed 's/Tailscale v//' | sed -n '1p')
+PREVIOUS=$(curl -s https://tailscale.com/changelog | sed -n 's/.*\(Tailscale v[0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p' | sed 's/Tailscale v//' | sed -n '2p')
 
 [ "/$1/" = "/-?/" -o "/$1/" = "/--help/" ] && usage
 
@@ -155,7 +157,7 @@ install() {
 
 # Check the latest version of Tailscale
   echo -e "${NC}[$SCRIPT] Getting latest Tailscale version...${NC}"
-  LATEST=$(curl -ks https://tailscale.com/changelog | awk '/<a id="/{print $3;}0' | head -n 1 | cut -c2-)
+  
   if [ -z "$LATEST" ] ; then
 	echo -e "${RED}[$SCRIPT] ERROR! Could not determine latest Tailscale version. Aborting...${NC}"
 	exit 2
@@ -327,7 +329,7 @@ regress() {
 
 # Check the previous version of Tailscale
   echo -e "${NC}[$SCRIPT] Getting previous Tailscale version...${NC}"
-  PREVIOUS=$(curl -ks https://tailscale.com/changelog | awk '/<a id="/{print $3;}0' | head -n 2 | tail -n 1 | cut -c2-)
+  
   if [ -z "$PREVIOUS" ] ; then
     echo -e "${RED}[$SCRIPT] ERROR! Could not determine previous Tailscale version. Aborting...${NC}"
 	exit 2
@@ -469,7 +471,7 @@ upgrade() {
 
 # Check the latest version of Tailscale
   echo -e "${NC}[$SCRIPT] Getting latest Tailscale version...${NC}"
-  LATEST=$(curl -ks https://tailscale.com/changelog | awk '/<a id="/{print $3;}0' | head -n 1 | cut -c2-)
+  
   [ -z "$LATEST" ] && { echo -e "${RED}[$SCRIPT] ERROR! Could not determine latest Tailscale version. Aborting...${NC}"; exit 2; }
   echo -e "${NC}[$SCRIPT] Latest Tailscale version is $LATEST${NC}"
 
@@ -529,8 +531,14 @@ get_tailscale() {
 
 # create symbolic links to the binaries
   echo -e "${NC}[$SCRIPT] Creating symbolic links...${NC}"
-  ln -s $PARTPATH/tailscale/tailscale /usr/sbin/tailscale
-  ln -s $PARTPATH/tailscale/tailscaled /usr/sbin/tailscaled
+
+  if [ ! -e /usr/sbin/tailscale ]; then
+    ln -s $PARTPATH/tailscale/tailscale /usr/sbin/tailscale
+  fi
+
+  if [ ! -e /usr/sbin/tailscaled ]; then
+    ln -s $PARTPATH/tailscale/tailscaled /usr/sbin/tailscaled
+  fi
 
   return
 }
