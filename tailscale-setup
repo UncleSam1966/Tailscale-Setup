@@ -68,8 +68,8 @@ UNINSTALL=N
 ARCH=""
 PARTPATH="/root"
 FIRSTRUN="N"
-LATEST=$(curl -s https://tailscale.com/changelog | sed -n 's/.*\(Tailscale v[0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p' | sed 's/Tailscale v//' | sed -n '1p')
-PREVIOUS=$(curl -s https://tailscale.com/changelog | sed -n 's/.*\(Tailscale v[0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p' | sed 's/Tailscale v//' | sed -n '2p')
+LATEST=$(curl -s https://pkgs.tailscale.com/stable/#static | sed -n 's/.*value="\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p' | sed -n '1p')
+PREVIOUS=$(curl -s https://pkgs.tailscale.com/stable/#static | sed -n 's/.*value="\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p' | sed -n '2p')
 
 [ "/$1/" = "/-?/" -o "/$1/" = "/--help/" ] && usage
 
