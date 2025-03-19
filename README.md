@@ -52,7 +52,7 @@ Should be applicable to all firmware versions supported by ```tch-gui-unhide```.
 Make sure you are in the directory in which the ```tch-gui-unhide``` script in installed, and then execute the above ```tailscale-setup``` commands to install the latest tailscale-setup package and configuration.
 
 ## Installation
-curl -skLo tch-gui-unhide-xtra.tailscale https://github.com/UncleSam1966/tch-tailscale/releases/latest/download/tch-gui-unhide-xtra.tailscale && ./tch-gui-unhide -y
+    curl -skLo tch-gui-unhide-xtra.tailscale https://github.com/UncleSam1966/tch-tailscale/releases/latest/download/tch-gui-unhide-xtra.tailscale && ./tch-gui-unhide -y
 
 ## Removal Instructions
 Remove the Tailscale instalation with ```tailscale-setup -yu```
