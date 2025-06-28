@@ -70,8 +70,14 @@ UNINSTALL=N
 ARCH=""
 PARTPATH="/root"
 FIRSTRUN="N"
-LATEST=$(curl -s https://pkgs.tailscale.com/stable/#static | sed -n 's/.*value="\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p' | sed -n '1p')
-PREVIOUS=$(curl -s https://pkgs.tailscale.com/stable/#static | sed -n 's/.*value="\([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p' | sed -n '2p')
+
+# Get latest published version from the static tarballs
+LATEST=$(curl -s https://pkgs.tailscale.com/stable/ \
+  | grep -o 'tailscale_[0-9.]\+_[a-zA-Z0-9]\+\.tgz' \
+  | sed -n 's/tailscale_\([0-9.]\+\)_[a-zA-Z0-9]\+\.tgz/\1/p' \
+  | grep -v '-' \
+  | sort -Vru \
+  | head -n1)
 
 [ "/$1/" = "/-?/" -o "/$1/" = "/--help/" ] && usage
 
@@ -320,7 +326,7 @@ regress() {
 	fi
   fi
 
-# check the version of the installed Tailscale
+# check the installed version of Tailscale
   echo -e "${NC}[$SCRIPT] Getting installed Tailscale version...${NC}"
   CURRENT=$(/usr/sbin/tailscale --version | head -n 1)
   if [ -z "$CURRENT" ] ; then
@@ -331,6 +337,8 @@ regress() {
 
 # Check the previous version of Tailscale
   echo -e "${NC}[$SCRIPT] Getting previous Tailscale version...${NC}"
+
+  get_previous $CURRENT
   
   if [ -z "$PREVIOUS" ] ; then
     echo -e "${RED}[$SCRIPT] ERROR! Could not determine previous Tailscale version. Aborting...${NC}"
@@ -543,6 +551,28 @@ get_tailscale() {
   fi
 
   return
+}
+
+get_previous() {
+# Fetch repo tags, clean and sort descending
+  VERSIONS=$(curl -s "https://pkgs.tailscale.com/stable/?v=latest" \
+    | grep '<option' \
+    | sed 's/.*value="\([^"]*\)".*/\1/' \
+    | sort -Vru)
+
+# Find latest or installed version in the list, then pick previous
+	PREVIOUS=""
+	FOUND=0
+
+	for version in $VERSIONS; do
+		if [ "$FOUND" -eq 1 ]; then
+			PREVIOUS=$version
+			break
+		fi
+		if [ "$version" = "$1" ]; then
+			FOUND=1
+		fi
+	done
 }
 
 cleanup() {
